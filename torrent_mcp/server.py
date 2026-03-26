@@ -8,7 +8,9 @@ import httpx
 import structlog
 from fastmcp import Context, FastMCP
 
+from torrent_mcp.clients import TorrentClient
 from torrent_mcp.clients.jackett import JackettClient
+from torrent_mcp.clients.qbittorrent import QBittorrentClient
 from torrent_mcp.clients.transmission import TransmissionClient
 from torrent_mcp.config import Settings
 from torrent_mcp.tools import manage, search
@@ -21,33 +23,57 @@ async def lifespan(server: FastMCP) -> AsyncIterator[dict[str, Any]]:
     """Manage HTTP client lifecycles."""
     settings = Settings()  # type: ignore[call-arg]
 
-    transmission_auth: tuple[str, str] | None = None
-    if settings.transmission_username and settings.transmission_password:
-        transmission_auth = (settings.transmission_username, settings.transmission_password)
+    backend = settings.torrent_backend.lower()
 
-    async with (
-        httpx.AsyncClient(
-            timeout=settings.http_timeout,
-            auth=transmission_auth,
-        ) as transmission_http,
-        httpx.AsyncClient(
-            timeout=settings.http_timeout,
-        ) as jackett_http,
-    ):
-        transmission = TransmissionClient(transmission_http, settings.transmission_url)
+    async with httpx.AsyncClient(timeout=settings.http_timeout) as jackett_http:
         jackett = JackettClient(jackett_http, settings.jackett_url, settings.jackett_api_key)
 
-        log.info(
-            "server started",
-            transmission_url=settings.transmission_url,
-            jackett_url=settings.jackett_url,
-        )
-
-        yield {
-            "settings": settings,
-            "transmission": transmission,
-            "jackett": jackett,
-        }
+        if backend == "qbittorrent":
+            async with httpx.AsyncClient(
+                base_url=settings.qbittorrent_url,
+                timeout=settings.http_timeout,
+            ) as qbit_http:
+                torrent_client: TorrentClient = QBittorrentClient(
+                    qbit_http,
+                    settings.qbittorrent_username,
+                    settings.qbittorrent_password,
+                )
+                log.info(
+                    "server started",
+                    backend="qbittorrent",
+                    qbittorrent_url=settings.qbittorrent_url,
+                    jackett_url=settings.jackett_url,
+                )
+                yield {
+                    "settings": settings,
+                    "torrent": torrent_client,
+                    "jackett": jackett,
+                }
+        else:
+            transmission_auth: tuple[str, str] | None = None
+            if settings.transmission_username and settings.transmission_password:
+                transmission_auth = (
+                    settings.transmission_username,
+                    settings.transmission_password,
+                )
+            async with httpx.AsyncClient(
+                timeout=settings.http_timeout,
+                auth=transmission_auth,
+            ) as transmission_http:
+                torrent_client = TransmissionClient(
+                    transmission_http, settings.transmission_url
+                )
+                log.info(
+                    "server started",
+                    backend="transmission",
+                    transmission_url=settings.transmission_url,
+                    jackett_url=settings.jackett_url,
+                )
+                yield {
+                    "settings": settings,
+                    "torrent": torrent_client,
+                    "jackett": jackett,
+                }
 
         log.info("server shutting down")
 
@@ -55,9 +81,9 @@ async def lifespan(server: FastMCP) -> AsyncIterator[dict[str, Any]]:
 mcp = FastMCP("torrent-mcp", lifespan=lifespan)
 
 
-def _transmission(ctx: Context) -> TransmissionClient:
-    """Extract TransmissionClient from lifespan context."""
-    return ctx.lifespan_context["transmission"]  # type: ignore[no-any-return]
+def _torrent(ctx: Context) -> TorrentClient:
+    """Extract torrent client from lifespan context."""
+    return ctx.lifespan_context["torrent"]  # type: ignore[no-any-return]
 
 
 def _jackett(ctx: Context) -> JackettClient:
@@ -98,12 +124,12 @@ async def list_indexers(ctx: Context) -> str:
 
 @mcp.tool()
 async def list_torrents(ctx: Context, status_filter: str | None = None) -> str:
-    """List all torrents from Transmission with their current status.
+    """List all torrents with their current status.
 
     Args:
         status_filter: Filter by status: downloading, seeding, stopped, all (default: all)
     """
-    return await manage.list_torrents(_transmission(ctx), status_filter=status_filter)
+    return await manage.list_torrents(_torrent(ctx), status_filter=status_filter)
 
 
 @mcp.tool()
@@ -113,7 +139,7 @@ async def get_torrent(id_or_hash: str, ctx: Context) -> str:
     Args:
         id_or_hash: Torrent ID (integer) or hash string
     """
-    return await manage.get_torrent(_transmission(ctx), id_or_hash)
+    return await manage.get_torrent(_torrent(ctx), id_or_hash)
 
 
 @mcp.tool()
@@ -131,7 +157,7 @@ async def add_torrent(
         paused: Add in paused state (default: false)
     """
     return await manage.add_torrent(
-        _transmission(ctx), url, download_dir=download_dir, paused=paused
+        _torrent(ctx), url, download_dir=download_dir, paused=paused
     )
 
 
@@ -142,7 +168,7 @@ async def start_torrent(id_or_hash: str, ctx: Context) -> str:
     Args:
         id_or_hash: Torrent ID (integer) or hash string
     """
-    return await manage.start_torrent(_transmission(ctx), id_or_hash)
+    return await manage.start_torrent(_torrent(ctx), id_or_hash)
 
 
 @mcp.tool()
@@ -152,7 +178,7 @@ async def stop_torrent(id_or_hash: str, ctx: Context) -> str:
     Args:
         id_or_hash: Torrent ID (integer) or hash string
     """
-    return await manage.stop_torrent(_transmission(ctx), id_or_hash)
+    return await manage.stop_torrent(_torrent(ctx), id_or_hash)
 
 
 @mcp.tool()
@@ -161,18 +187,18 @@ async def remove_torrent(
     ctx: Context,
     delete_data: bool = False,
 ) -> str:
-    """Remove a torrent from Transmission.
+    """Remove a torrent.
 
     Args:
         id_or_hash: Torrent ID (integer) or hash string
         delete_data: Also delete downloaded files (default: false)
     """
     return await manage.remove_torrent(
-        _transmission(ctx), id_or_hash, delete_data=delete_data
+        _torrent(ctx), id_or_hash, delete_data=delete_data
     )
 
 
 @mcp.tool()
 async def get_session_stats(ctx: Context) -> str:
-    """Get Transmission global transfer statistics and disk space."""
-    return await manage.get_session_stats(_transmission(ctx))
+    """Get global transfer statistics and disk space."""
+    return await manage.get_session_stats(_torrent(ctx))

@@ -6,6 +6,7 @@ import httpx
 import pytest
 
 from torrent_mcp.clients.jackett import JackettClient
+from torrent_mcp.clients.qbittorrent import QBittorrentClient
 from torrent_mcp.clients.transmission import TransmissionClient
 
 
@@ -103,3 +104,31 @@ def transmission_client(mock_transport: MockTransport) -> TransmissionClient:
 def jackett_client(mock_transport: MockTransport) -> JackettClient:
     http = httpx.AsyncClient(transport=mock_transport)
     return JackettClient(http, "http://localhost:9117", "test-api-key")
+
+
+SAMPLE_QB_TORRENT: dict[str, Any] = {
+    "name": "Test.Torrent",
+    "hash": "abc123def456abc123def456abc123def456abcd",
+    "state": "downloading",
+    "progress": 0.75,
+    "dlspeed": 1048576,
+    "upspeed": 524288,
+    "size": 1073741824,
+    "eta": 3600,
+    "ratio": 1.5,
+    "save_path": "/downloads/",
+    "num_seeds": 12,
+    "tags": "movies,linux",
+    "magnet_uri": "magnet:?xt=urn:btih:abc123def456abc123def456abc123def456abcd",
+}
+
+
+def make_qb_login_response(success: bool = True) -> httpx.Response:
+    """Build a mock qBittorrent login response."""
+    return httpx.Response(200, text="Ok." if success else "Fails.")
+
+
+@pytest.fixture
+def qbittorrent_client(mock_transport: MockTransport) -> QBittorrentClient:
+    http = httpx.AsyncClient(transport=mock_transport, base_url="http://localhost:8080")
+    return QBittorrentClient(http, "admin", "adminadmin")

@@ -1,6 +1,6 @@
-"""MCP tools for Transmission torrent management."""
+"""MCP tools for torrent management."""
 
-from torrent_mcp.clients.transmission import TransmissionClient
+from torrent_mcp.clients import TorrentClient
 
 
 def _format_size(size_bytes: int) -> str:
@@ -43,7 +43,7 @@ def _format_eta(seconds: int) -> str:
 
 
 async def list_torrents(
-    client: TransmissionClient,
+    client: TorrentClient,
     status_filter: str | None = None,
 ) -> str:
     """List all torrents from Transmission with their current status.
@@ -80,7 +80,7 @@ async def list_torrents(
     return "\n".join(lines)
 
 
-async def get_torrent(client: TransmissionClient, id_or_hash: str) -> str:
+async def get_torrent(client: TorrentClient, id_or_hash: str) -> str:
     """Get detailed information about a specific torrent.
 
     Args:
@@ -131,7 +131,7 @@ async def get_torrent(client: TransmissionClient, id_or_hash: str) -> str:
 
 
 async def add_torrent(
-    client: TransmissionClient,
+    client: TorrentClient,
     url: str,
     download_dir: str | None = None,
     paused: bool = False,
@@ -154,7 +154,7 @@ async def add_torrent(
     return f"Torrent added: {name}\nHash: {info.hash_string}\nStatus: {info.status}"
 
 
-async def start_torrent(client: TransmissionClient, id_or_hash: str) -> str:
+async def start_torrent(client: TorrentClient, id_or_hash: str) -> str:
     """Resume a stopped torrent.
 
     Args:
@@ -164,7 +164,7 @@ async def start_torrent(client: TransmissionClient, id_or_hash: str) -> str:
     return f"Started: {name}"
 
 
-async def stop_torrent(client: TransmissionClient, id_or_hash: str) -> str:
+async def stop_torrent(client: TorrentClient, id_or_hash: str) -> str:
     """Pause an active torrent.
 
     Args:
@@ -175,7 +175,7 @@ async def stop_torrent(client: TransmissionClient, id_or_hash: str) -> str:
 
 
 async def remove_torrent(
-    client: TransmissionClient,
+    client: TorrentClient,
     id_or_hash: str,
     delete_data: bool = False,
 ) -> str:
@@ -190,12 +190,12 @@ async def remove_torrent(
     return f"Removed: {name}{suffix}"
 
 
-async def get_session_stats(client: TransmissionClient) -> str:
-    """Get Transmission global transfer statistics and disk space."""
+async def get_session_stats(client: TorrentClient) -> str:
+    """Get global transfer statistics and disk space."""
     stats = await client.get_session_stats()
 
     lines: list[str] = [
-        "Transmission Session Stats\n",
+        "Session Stats\n",
         f"Torrents: {stats.active_torrent_count} active, "
         f"{stats.paused_torrent_count} paused, "
         f"{stats.torrent_count} total",

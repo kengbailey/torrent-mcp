@@ -13,6 +13,10 @@ class TransmissionError(TorrentMCPError):
     """Error from Transmission JSON-RPC."""
 
 
+class QBittorrentError(TorrentMCPError):
+    """Error from qBittorrent Web API."""
+
+
 class JackettError(TorrentMCPError):
     """Error from Jackett Torznab API."""
 
