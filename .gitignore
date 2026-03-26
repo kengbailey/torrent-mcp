@@ -16,6 +16,12 @@ build/
 # Environment
 .env
 
+# Workspace / AI
+.claude/
+.trellis/
+AGENTS.md
+openspec/
+
 # IDE
 .idea/
 .vscode/
