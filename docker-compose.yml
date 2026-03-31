@@ -1,0 +1,7 @@
+services:
+  torrent-mcp:
+    container_name: torrent-mcp
+    build: .
+    network_mode: host
+    env_file: .env
+    restart: unless-stopped

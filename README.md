@@ -29,10 +29,19 @@ All configuration via environment variables:
 | `MCP_HOST` | `127.0.0.1` | Server bind host |
 | `MCP_PORT` | `8000` | Server bind port |
 
-## Run
+## Run (Docker)
 
 ```bash
-JACKETT_API_KEY=your-key TORRENT_BACKEND=qbittorrent python -m torrent_mcp
+cp .env.example .env        # edit .env with your values
+docker compose up -d
+```
+
+Server will be available at `127.0.0.1:6735`.
+
+## Run (Local)
+
+```bash
+JACKETT_API_KEY=your-key python -m torrent_mcp
 ```
 
 ## MCP Tools
