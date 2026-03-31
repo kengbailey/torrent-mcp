@@ -26,7 +26,7 @@ All configuration via environment variables:
 | `QBITTORRENT_URL` | `http://localhost:8080` | qBittorrent WebUI URL |
 | `QBITTORRENT_USERNAME` | `admin` | qBittorrent username |
 | `QBITTORRENT_PASSWORD` | `adminadmin` | qBittorrent password |
-| `MCP_HOST` | `0.0.0.0` | Server bind host |
+| `MCP_HOST` | `127.0.0.1` | Server bind host |
 | `MCP_PORT` | `8000` | Server bind port |
 
 ## Run

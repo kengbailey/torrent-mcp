@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     jackett_api_key: str
 
     # MCP Server
-    mcp_host: str = "0.0.0.0"
+    mcp_host: str = "127.0.0.1"
     mcp_port: int = 8000
 
     # Logging
