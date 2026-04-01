@@ -21,9 +21,9 @@ class Settings(BaseSettings):
     qbittorrent_username: str = "admin"
     qbittorrent_password: str = "adminadmin"
 
-    # Jackett
-    jackett_url: str = "http://localhost:9117"
-    jackett_api_key: str
+    # Prowlarr
+    prowlarr_url: str = "http://localhost:9696"
+    prowlarr_api_key: str
 
     # MCP Server
     mcp_host: str = "127.0.0.1"

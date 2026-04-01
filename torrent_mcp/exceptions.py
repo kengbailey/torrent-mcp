@@ -17,8 +17,8 @@ class QBittorrentError(TorrentMCPError):
     """Error from qBittorrent Web API."""
 
 
-class JackettError(TorrentMCPError):
-    """Error from Jackett Torznab API."""
+class ProwlarrError(TorrentMCPError):
+    """Error from Prowlarr REST API."""
 
 
 class ConfigError(TorrentMCPError):

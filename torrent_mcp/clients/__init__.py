@@ -7,7 +7,7 @@ from typing import Protocol
 from torrent_mcp.models.torrent import SessionStats, TorrentDetail, TorrentInfo
 
 __all__ = [
-    "JackettClient",
+    "ProwlarrClient",
     "QBittorrentClient",
     "TorrentClient",
     "TransmissionClient",
@@ -32,6 +32,7 @@ class TorrentClient(Protocol):
         url: str,
         download_dir: str | None = None,
         paused: bool = False,
+        torrent_data: bytes | None = None,
     ) -> TorrentInfo: ...
 
     async def start_torrent(self, id_or_hash: str) -> str: ...
@@ -45,6 +46,6 @@ class TorrentClient(Protocol):
     async def get_session_stats(self) -> SessionStats: ...
 
 
-from torrent_mcp.clients.jackett import JackettClient  # noqa: E402
+from torrent_mcp.clients.prowlarr import ProwlarrClient  # noqa: E402
 from torrent_mcp.clients.qbittorrent import QBittorrentClient  # noqa: E402
 from torrent_mcp.clients.transmission import TransmissionClient  # noqa: E402

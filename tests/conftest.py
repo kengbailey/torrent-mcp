@@ -5,7 +5,6 @@ from typing import Any
 import httpx
 import pytest
 
-from torrent_mcp.clients.jackett import JackettClient
 from torrent_mcp.clients.qbittorrent import QBittorrentClient
 from torrent_mcp.clients.transmission import TransmissionClient
 
@@ -18,17 +17,6 @@ def make_transmission_response(
 
     body = {"result": result, "arguments": arguments or {}}
     return httpx.Response(200, json=body)
-
-
-def make_jackett_xml(items_xml: str = "", channel_extra: str = "") -> httpx.Response:
-    """Build a mock Jackett Torznab XML response."""
-    xml = (
-        '<?xml version="1.0" encoding="UTF-8"?>'
-        "<rss><channel>"
-        f"{channel_extra}{items_xml}"
-        "</channel></rss>"
-    )
-    return httpx.Response(200, text=xml)
 
 
 SAMPLE_TORRENT: dict[str, Any] = {
@@ -57,20 +45,6 @@ SAMPLE_TORRENT: dict[str, Any] = {
     ],
 }
 
-SAMPLE_SEARCH_ITEM_XML = """
-<item>
-  <title>Test.Movie.2024.1080p</title>
-  <link>http://example.com/dl/123</link>
-  <size>2147483648</size>
-  <category>Movies</category>
-  <pubDate>Mon, 01 Jan 2024 00:00:00 +0000</pubDate>
-  <torznab:attr name="seeders" value="50"/>
-  <torznab:attr name="peers" value="10"/>
-  <torznab:attr name="size" value="2147483648"/>
-  <torznab:attr name="magneturl" value="magnet:?xt=urn:btih:deadbeef"/>
-</item>
-"""
-
 
 class MockTransport(httpx.AsyncBaseTransport):
     """Mock transport that returns pre-configured responses."""
@@ -98,12 +72,6 @@ def mock_transport() -> MockTransport:
 def transmission_client(mock_transport: MockTransport) -> TransmissionClient:
     http = httpx.AsyncClient(transport=mock_transport)
     return TransmissionClient(http, "http://localhost:9091/transmission/rpc")
-
-
-@pytest.fixture
-def jackett_client(mock_transport: MockTransport) -> JackettClient:
-    http = httpx.AsyncClient(transport=mock_transport)
-    return JackettClient(http, "http://localhost:9117", "test-api-key")
 
 
 SAMPLE_QB_TORRENT: dict[str, Any] = {

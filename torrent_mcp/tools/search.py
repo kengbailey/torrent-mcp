@@ -1,26 +1,27 @@
-"""MCP tools for Jackett torrent search."""
+"""MCP tools for Prowlarr torrent search."""
 
-from torrent_mcp.clients.jackett import JackettClient
+from torrent_mcp.clients.prowlarr import ProwlarrClient
 
 
 def _format_size(size_bytes: int) -> str:
     """Format bytes into human-readable size."""
     if size_bytes <= 0:
         return "Unknown"
+    value = float(size_bytes)
     for unit in ("B", "KB", "MB", "GB", "TB"):
-        if size_bytes < 1024:
-            return f"{size_bytes:.1f} {unit}"
-        size_bytes /= 1024  # type: ignore[assignment]
-    return f"{size_bytes:.1f} PB"
+        if value < 1024:
+            return f"{value:.1f} {unit}"
+        value /= 1024
+    return f"{value:.1f} PB"
 
 
 async def search_torrents(
-    client: JackettClient,
+    client: ProwlarrClient,
     query: str,
     category: str | None = None,
     limit: int = 25,
 ) -> str:
-    """Search for torrents across all configured Jackett indexers.
+    """Search for torrents across all configured Prowlarr indexers.
 
     Args:
         query: Search terms to look for
@@ -35,7 +36,8 @@ async def search_torrents(
     lines: list[str] = [f"Search Results for '{query}' ({len(results)} found)\n"]
 
     for i, r in enumerate(results, 1):
-        lines.append(f"{i}. {r.title}")
+        prefix = f"[{r.indexer}] " if r.indexer else ""
+        lines.append(f"{i}. {prefix}{r.title}")
         parts: list[str] = [f"Size: {_format_size(r.size)}"]
         parts.append(f"Seeders: {r.seeders}")
         parts.append(f"Leechers: {r.leechers}")
@@ -44,22 +46,23 @@ async def search_torrents(
         lines.append(f"   {' | '.join(parts)}")
         if r.magnet_url:
             lines.append(f"   Magnet: {r.magnet_url}")
-        elif r.link:
-            lines.append(f"   Link: {r.link}")
+        elif r.download_url:
+            lines.append(f"   Link: {r.download_url}")
         lines.append("")
 
     return "\n".join(lines)
 
 
-async def list_indexers(client: JackettClient) -> str:
-    """List all configured and active Jackett indexers."""
+async def list_indexers(client: ProwlarrClient) -> str:
+    """List all configured Prowlarr indexers."""
     indexers = await client.list_indexers()
 
     if not indexers:
-        return "No configured indexers found in Jackett."
+        return "No configured indexers found in Prowlarr."
 
     lines: list[str] = [f"Configured Indexers ({len(indexers)})\n"]
     for idx in indexers:
-        lines.append(f"- {idx.name} (id: {idx.id})")
+        status = "enabled" if idx.enabled else "disabled"
+        lines.append(f"- {idx.name} (id: {idx.id}, {status})")
 
     return "\n".join(lines)

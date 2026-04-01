@@ -184,6 +184,69 @@ async def test_add_torrent_duplicate() -> None:
     assert "already exists" in result
 
 
+async def test_add_torrent_magnet_passthrough() -> None:
+    """Magnet links should be passed directly without downloading."""
+    client = AsyncMock()
+    client.add_torrent.return_value = TorrentInfo(
+        name="Magnet.Torrent",
+        hash_string="magnethash",
+        status="download queue",
+        percent_done=0.0,
+        rate_download=0,
+        rate_upload=0,
+        total_size=0,
+        eta=-1,
+        upload_ratio=0.0,
+    )
+
+    http_client = AsyncMock()
+    result = await add_torrent(
+        client, "magnet:?xt=urn:btih:magnethash", http_client=http_client
+    )
+    assert "Torrent added" in result
+    # http_client should NOT have been called for magnet links
+    http_client.get.assert_not_called()
+    # torrent_data should be None
+    client.add_torrent.assert_called_once()
+    call_kwargs = client.add_torrent.call_args
+    assert call_kwargs.kwargs.get("torrent_data") is None
+
+
+async def test_add_torrent_http_proxy() -> None:
+    """HTTP URLs should be downloaded and proxied as torrent_data."""
+    client = AsyncMock()
+    client.add_torrent.return_value = TorrentInfo(
+        name="Downloaded.Torrent",
+        hash_string="dlhash",
+        status="download queue",
+        percent_done=0.0,
+        rate_download=0,
+        rate_upload=0,
+        total_size=0,
+        eta=-1,
+        upload_ratio=0.0,
+    )
+
+    mock_response = AsyncMock()
+    mock_response.content = b"fake torrent data"
+    mock_response.raise_for_status = lambda: None
+
+    http_client = AsyncMock()
+    http_client.get.return_value = mock_response
+
+    result = await add_torrent(
+        client,
+        "http://prowlarr:9696/1/download?link=abc",
+        http_client=http_client,
+    )
+    assert "Torrent added" in result
+    # http_client should have been called
+    http_client.get.assert_called_once()
+    # torrent_data should contain the downloaded bytes
+    call_kwargs = client.add_torrent.call_args
+    assert call_kwargs.kwargs.get("torrent_data") == b"fake torrent data"
+
+
 # --- start/stop/remove ---
 
 

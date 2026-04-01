@@ -192,6 +192,37 @@ async def test_add_torrent_duplicate(
     assert "Existing.Torrent" in result.name
 
 
+async def test_add_torrent_metainfo(
+    mock_transport: MockTransport, transmission_client: TransmissionClient
+) -> None:
+    """When torrent_data is provided, use metainfo instead of filename."""
+    mock_transport.add_response(
+        make_transmission_response(
+            arguments={
+                "torrent-added": {
+                    "name": "File.Torrent",
+                    "hashString": "filehash123",
+                    "id": 7,
+                }
+            }
+        )
+    )
+
+    torrent_bytes = b"fake torrent file content"
+    result = await transmission_client.add_torrent(
+        "", torrent_data=torrent_bytes
+    )
+    assert result.name == "File.Torrent"
+
+    # Verify metainfo was sent, not filename
+    import json
+
+    request = mock_transport.requests[0]
+    body = json.loads(request.content)
+    assert "metainfo" in body["arguments"]
+    assert "filename" not in body["arguments"]
+
+
 # --- start/stop/remove ---
 
 

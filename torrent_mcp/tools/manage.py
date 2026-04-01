@@ -1,6 +1,11 @@
 """MCP tools for torrent management."""
 
+import httpx
+import structlog
+
 from torrent_mcp.clients import TorrentClient
+
+log = structlog.get_logger()
 
 
 def _format_size(size_bytes: int) -> str:
@@ -130,11 +135,21 @@ async def get_torrent(client: TorrentClient, id_or_hash: str) -> str:
     return "\n".join(lines)
 
 
+async def _download_torrent_file(
+    http_client: httpx.AsyncClient, url: str
+) -> bytes:
+    """Download a .torrent file from a URL."""
+    response = await http_client.get(url, follow_redirects=True)
+    response.raise_for_status()
+    return response.content
+
+
 async def add_torrent(
     client: TorrentClient,
     url: str,
     download_dir: str | None = None,
     paused: bool = False,
+    http_client: httpx.AsyncClient | None = None,
 ) -> str:
     """Add a torrent by magnet link or URL.
 
@@ -142,8 +157,22 @@ async def add_torrent(
         url: Magnet link or URL to a .torrent file
         download_dir: Optional override for download directory
         paused: Add in paused state (default: false)
+        http_client: HTTP client for downloading .torrent files from URLs
     """
-    info = await client.add_torrent(url, download_dir=download_dir, paused=paused)
+    torrent_data: bytes | None = None
+
+    if not url.startswith("magnet:") and http_client is not None:
+        try:
+            torrent_data = await _download_torrent_file(http_client, url)
+            log.info("downloaded torrent file", url=url[:80], size=len(torrent_data))
+        except httpx.HTTPStatusError as exc:
+            return f"Failed to download torrent file: HTTP {exc.response.status_code}"
+        except httpx.ConnectError:
+            return f"Failed to download torrent file: cannot connect to {url[:80]}"
+
+    info = await client.add_torrent(
+        url, download_dir=download_dir, paused=paused, torrent_data=torrent_data
+    )
 
     is_dup = info.name.startswith("[duplicate] ")
     name = info.name.removeprefix("[duplicate] ")

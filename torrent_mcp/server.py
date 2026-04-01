@@ -9,7 +9,7 @@ import structlog
 from fastmcp import Context, FastMCP
 
 from torrent_mcp.clients import TorrentClient
-from torrent_mcp.clients.jackett import JackettClient
+from torrent_mcp.clients.prowlarr import ProwlarrClient
 from torrent_mcp.clients.qbittorrent import QBittorrentClient
 from torrent_mcp.clients.transmission import TransmissionClient
 from torrent_mcp.config import Settings
@@ -25,8 +25,14 @@ async def lifespan(server: FastMCP) -> AsyncIterator[dict[str, Any]]:
 
     backend = settings.torrent_backend.lower()
 
-    async with httpx.AsyncClient(timeout=settings.http_timeout) as jackett_http:
-        jackett = JackettClient(jackett_http, settings.jackett_url, settings.jackett_api_key)
+    async with (
+        httpx.AsyncClient(
+            base_url=settings.prowlarr_url,
+            timeout=settings.http_timeout,
+        ) as prowlarr_http,
+        httpx.AsyncClient(timeout=settings.http_timeout) as download_http,
+    ):
+        prowlarr = ProwlarrClient(prowlarr_http, settings.prowlarr_api_key)
 
         if backend == "qbittorrent":
             async with httpx.AsyncClient(
@@ -42,12 +48,13 @@ async def lifespan(server: FastMCP) -> AsyncIterator[dict[str, Any]]:
                     "server started",
                     backend="qbittorrent",
                     qbittorrent_url=settings.qbittorrent_url,
-                    jackett_url=settings.jackett_url,
+                    prowlarr_url=settings.prowlarr_url,
                 )
                 yield {
                     "settings": settings,
                     "torrent": torrent_client,
-                    "jackett": jackett,
+                    "prowlarr": prowlarr,
+                    "download_http": download_http,
                 }
         else:
             transmission_auth: tuple[str, str] | None = None
@@ -67,12 +74,13 @@ async def lifespan(server: FastMCP) -> AsyncIterator[dict[str, Any]]:
                     "server started",
                     backend="transmission",
                     transmission_url=settings.transmission_url,
-                    jackett_url=settings.jackett_url,
+                    prowlarr_url=settings.prowlarr_url,
                 )
                 yield {
                     "settings": settings,
                     "torrent": torrent_client,
-                    "jackett": jackett,
+                    "prowlarr": prowlarr,
+                    "download_http": download_http,
                 }
 
         log.info("server shutting down")
@@ -86,9 +94,14 @@ def _torrent(ctx: Context) -> TorrentClient:
     return ctx.lifespan_context["torrent"]  # type: ignore[no-any-return]
 
 
-def _jackett(ctx: Context) -> JackettClient:
-    """Extract JackettClient from lifespan context."""
-    return ctx.lifespan_context["jackett"]  # type: ignore[no-any-return]
+def _prowlarr(ctx: Context) -> ProwlarrClient:
+    """Extract ProwlarrClient from lifespan context."""
+    return ctx.lifespan_context["prowlarr"]  # type: ignore[no-any-return]
+
+
+def _download_http(ctx: Context) -> httpx.AsyncClient:
+    """Extract download HTTP client from lifespan context."""
+    return ctx.lifespan_context["download_http"]  # type: ignore[no-any-return]
 
 
 # --- Search tools ---
@@ -98,25 +111,23 @@ def _jackett(ctx: Context) -> JackettClient:
 async def search_torrents(
     query: str,
     ctx: Context,
-    category: str | None = None,
     limit: int = 25,
 ) -> str:
-    """Search for torrents across all configured Jackett indexers.
+    """Search for torrents across all configured Prowlarr indexers.
 
     Args:
         query: Search terms to look for
-        category: Optional category filter (e.g. movies, tv, music)
         limit: Maximum number of results to return (default: 25)
     """
     return await search.search_torrents(
-        _jackett(ctx), query, category=category, limit=limit
+        _prowlarr(ctx), query, limit=limit
     )
 
 
 @mcp.tool()
 async def list_indexers(ctx: Context) -> str:
-    """List all configured and active Jackett indexers."""
-    return await search.list_indexers(_jackett(ctx))
+    """List all configured and active Prowlarr indexers."""
+    return await search.list_indexers(_prowlarr(ctx))
 
 
 # --- Management tools ---
@@ -157,7 +168,11 @@ async def add_torrent(
         paused: Add in paused state (default: false)
     """
     return await manage.add_torrent(
-        _torrent(ctx), url, download_dir=download_dir, paused=paused
+        _torrent(ctx),
+        url,
+        download_dir=download_dir,
+        paused=paused,
+        http_client=_download_http(ctx),
     )
 
 

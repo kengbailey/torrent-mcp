@@ -220,9 +220,16 @@ class TransmissionClient:
         url: str,
         download_dir: str | None = None,
         paused: bool = False,
+        torrent_data: bytes | None = None,
     ) -> TorrentInfo:
-        """Add a torrent by magnet link or URL."""
-        add_args: dict[str, Any] = {"filename": url, "paused": paused}
+        """Add a torrent by magnet link, URL, or raw .torrent file content."""
+        add_args: dict[str, Any] = {"paused": paused}
+        if torrent_data:
+            import base64
+
+            add_args["metainfo"] = base64.b64encode(torrent_data).decode()
+        else:
+            add_args["filename"] = url
         if download_dir:
             add_args["download-dir"] = download_dir
 

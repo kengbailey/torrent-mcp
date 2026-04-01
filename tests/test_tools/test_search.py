@@ -16,11 +16,13 @@ async def test_search_torrents_formats_results() -> None:
             leechers=10,
             magnet_url="magnet:?xt=urn:btih:deadbeef",
             category="Movies",
+            indexer="1337x",
         ),
     ]
 
     result = await search_torrents(client, "test movie")
     assert "Test.Movie.2024.1080p" in result
+    assert "[1337x]" in result
     assert "Seeders: 50" in result
     assert "Leechers: 10" in result
     assert "magnet:?xt=urn:btih:deadbeef" in result
@@ -35,30 +37,45 @@ async def test_search_torrents_no_results() -> None:
     assert "No results found" in result
 
 
-async def test_search_torrents_link_fallback() -> None:
-    """When no magnet_url, should show link instead."""
+async def test_search_torrents_download_url_fallback() -> None:
+    """When no magnet_url, should show download_url instead."""
     client = AsyncMock()
     client.search.return_value = [
         SearchResult(
             title="Test",
-            link="http://example.com/dl/123",
+            download_url="http://prowlarr:9696/1/download?link=abc",
+            indexer="1337x",
         ),
     ]
 
     result = await search_torrents(client, "test")
-    assert "http://example.com/dl/123" in result
+    assert "http://prowlarr:9696/1/download?link=abc" in result
+
+
+async def test_search_torrents_multi_indexer() -> None:
+    """Results from multiple indexers show source."""
+    client = AsyncMock()
+    client.search.return_value = [
+        SearchResult(title="Movie A", indexer="1337x", seeders=50),
+        SearchResult(title="Movie B", indexer="YTS", seeders=20),
+    ]
+
+    result = await search_torrents(client, "movie")
+    assert "[1337x]" in result
+    assert "[YTS]" in result
 
 
 async def test_list_indexers_formats() -> None:
     client = AsyncMock()
     client.list_indexers.return_value = [
-        IndexerInfo(name="Indexer One", id="idx1"),
-        IndexerInfo(name="Indexer Two", id="idx2"),
+        IndexerInfo(name="Indexer One", id=1, enabled=True),
+        IndexerInfo(name="Indexer Two", id=2, enabled=False),
     ]
 
     result = await list_indexers(client)
     assert "Indexer One" in result
-    assert "idx1" in result
+    assert "enabled" in result
+    assert "disabled" in result
     assert "Configured Indexers (2)" in result
 
 

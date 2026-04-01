@@ -289,6 +289,26 @@ async def test_add_torrent_failed(
         await qbittorrent_client.add_torrent(magnet)
 
 
+async def test_add_torrent_file_upload(
+    mock_transport: MockTransport, qbittorrent_client: QBittorrentClient
+) -> None:
+    """When torrent_data is provided, upload file instead of passing URL."""
+    mock_transport.add_response(make_qb_login_response())
+    # Add torrent via file upload
+    mock_transport.add_response(httpx.Response(200, text="Ok."))
+
+    torrent_bytes = b"fake torrent file content"
+    result = await qbittorrent_client.add_torrent(
+        "", torrent_data=torrent_bytes
+    )
+    assert result.name == "Unknown"  # No hash to look up
+
+    # Verify the request used multipart upload (content-type is multipart/form-data)
+    request = mock_transport.requests[1]  # [0] is login
+    content_type = request.headers.get("content-type", "")
+    assert "multipart/form-data" in content_type
+
+
 # --- start/stop/remove ---
 
 

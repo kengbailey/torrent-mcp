@@ -234,8 +234,9 @@ class QBittorrentClient:
         url: str,
         download_dir: str | None = None,
         paused: bool = False,
+        torrent_data: bytes | None = None,
     ) -> TorrentInfo:
-        """Add a torrent by magnet link or URL."""
+        """Add a torrent by magnet link, URL, or raw .torrent file content."""
         info_hash = _parse_magnet_hash(url)
 
         # Duplicate detection
@@ -250,17 +251,26 @@ class QBittorrentClient:
                 log.info("duplicate torrent detected", hash=info_hash)
                 return torrent
 
-        # Build multipart form data
-        form_data: dict[str, str] = {
-            "urls": url,
-            "paused": "true" if paused else "false",
-        }
-        if download_dir:
-            form_data["savepath"] = download_dir
-
-        response = await self._request(
-            "POST", "/api/v2/torrents/add", data=form_data
-        )
+        if torrent_data:
+            # Upload raw .torrent file content
+            files = {"torrents": ("torrent.torrent", torrent_data, "application/x-bittorrent")}
+            data: dict[str, str] = {"paused": "true" if paused else "false"}
+            if download_dir:
+                data["savepath"] = download_dir
+            response = await self._request(
+                "POST", "/api/v2/torrents/add", data=data, files=files
+            )
+        else:
+            # Pass URL or magnet directly
+            form_data: dict[str, str] = {
+                "urls": url,
+                "paused": "true" if paused else "false",
+            }
+            if download_dir:
+                form_data["savepath"] = download_dir
+            response = await self._request(
+                "POST", "/api/v2/torrents/add", data=form_data
+            )
         if response.text != "Ok.":
             raise QBittorrentError(f"Failed to add torrent: {response.text}")
 
