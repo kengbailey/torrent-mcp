@@ -77,7 +77,7 @@ async def list_torrents(
         if t.upload_ratio > 0:
             parts.append(f"Ratio: {t.upload_ratio:.2f}")
         lines.append(f"   {' | '.join(parts)}")
-        lines.append(f"   Size: {_format_size(t.total_size)} | Hash: {t.hash_string[:12]}...")
+        lines.append(f"   Size: {_format_size(t.total_size)} | Hash: {t.hash_string}")
         if t.error and t.error_string:
             lines.append(f"   Error: {t.error_string}")
         lines.append("")
