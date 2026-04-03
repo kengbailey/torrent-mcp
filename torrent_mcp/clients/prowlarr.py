@@ -34,7 +34,7 @@ class ProwlarrClient:
         self,
         query: str,
         category: str | None = None,
-        limit: int = 25,
+        limit: int = 15,
     ) -> list[SearchResult]:
         """Search for torrents across all enabled indexers."""
         params: dict[str, str | int] = {
@@ -91,6 +91,7 @@ class ProwlarrClient:
                 )
             )
 
+        results.sort(key=lambda r: r.seeders, reverse=True)
         return results[:limit]
 
     async def list_indexers(self) -> list[IndexerInfo]:

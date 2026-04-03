@@ -111,13 +111,15 @@ def _download_http(ctx: Context) -> httpx.AsyncClient:
 async def search_torrents(
     query: str,
     ctx: Context,
-    limit: int = 25,
+    limit: int = 15,
 ) -> str:
     """Search for torrents across all configured Prowlarr indexers.
 
+    Results are sorted by most active (seeders) first.
+
     Args:
         query: Search terms to look for
-        limit: Maximum number of results to return (default: 25)
+        limit: Maximum number of results to return (default: 15)
     """
     return await search.search_torrents(
         _prowlarr(ctx), query, limit=limit
