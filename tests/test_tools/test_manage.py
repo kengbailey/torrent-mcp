@@ -2,6 +2,7 @@
 
 from unittest.mock import AsyncMock
 
+from torrent_mcp.models.search import SearchResult
 from torrent_mcp.models.torrent import (
     CumulativeStats,
     FileInfo,
@@ -245,6 +246,58 @@ async def test_add_torrent_http_torrent_file() -> None:
     http_client.get.assert_called_once()
     call_kwargs = client.add_torrent.call_args
     assert call_kwargs.kwargs.get("torrent_data") == b"fake torrent data"
+
+
+async def test_add_torrent_by_hash_id() -> None:
+    """Hash IDs from search results should resolve via cache."""
+    from torrent_mcp.tools.search import _cache_set, _hash_id, _result_cache_raw
+
+    _result_cache_raw.clear()
+    url = "http://prowlarr:9696/1/download?link=cached123"
+    hid = _hash_id(url)
+    _cache_set(hid, SearchResult(
+        title="Cached.Torrent",
+        download_url=url,
+        indexer="1337x",
+        seeders=100,
+    ))
+
+    client = AsyncMock()
+    client.add_torrent.return_value = TorrentInfo(
+        name="Cached.Torrent",
+        hash_string="cachedhash",
+        status="download queue",
+        percent_done=0.0,
+        rate_download=0,
+        rate_upload=0,
+        total_size=0,
+        eta=-1,
+        upload_ratio=0.0,
+    )
+
+    mock_response = AsyncMock()
+    mock_response.status_code = 200
+    mock_response.content = b"fake torrent data"
+    mock_response.raise_for_status = lambda: None
+    mock_response.headers = {}
+
+    http_client = AsyncMock()
+    http_client.get.return_value = mock_response
+
+    result = await add_torrent(client, hid, http_client=http_client)
+    assert "Torrent added" in result
+    # Should have downloaded from the cached URL
+    http_client.get.assert_called_once()
+
+
+async def test_add_torrent_hash_id_not_found() -> None:
+    """Unknown hash ID should return error."""
+    from torrent_mcp.tools.search import _result_cache_raw
+
+    _result_cache_raw.clear()
+    client = AsyncMock()
+    result = await add_torrent(client, "zzzzz")
+    assert "Search result not found" in result
 
 
 async def test_add_torrent_http_redirect_magnet() -> None:

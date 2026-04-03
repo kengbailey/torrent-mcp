@@ -158,19 +158,34 @@ async def _download_torrent_file(
 
 async def add_torrent(
     client: TorrentClient,
-    url: str,
+    torrent_id: str,
     download_dir: str | None = None,
     paused: bool = False,
     http_client: httpx.AsyncClient | None = None,
 ) -> str:
-    """Add a torrent by magnet link or URL.
+    """Add a torrent using a search result ID, magnet link, or URL.
 
     Args:
-        url: Magnet link or URL to a .torrent file
+        torrent_id: 5-char hash ID from search results, magnet link, or URL
         download_dir: Optional override for download directory
         paused: Add in paused state (default: false)
         http_client: HTTP client for downloading .torrent files from URLs
     """
+    from torrent_mcp.tools.search import _cache_get
+
+    # Resolve hash ID to download URL
+    url: str
+    if torrent_id.startswith("magnet:"):
+        url = torrent_id
+    else:
+        cached = _cache_get(torrent_id)
+        if cached is not None:
+            url = cached.download_url
+        elif len(torrent_id) == 5:
+            return "Search result not found. Run search_torrents first."
+        else:
+            url = torrent_id
+
     torrent_data: bytes | None = None
     magnet_url: str = url
 

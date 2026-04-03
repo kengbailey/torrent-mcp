@@ -115,7 +115,8 @@ async def search_torrents(
 ) -> str:
     """Search for torrents across all configured Prowlarr indexers.
 
-    Results are sorted by most active (seeders) first.
+    Results are sorted by most active (seeders) first. Each result
+    includes a 5-character ID (e.g. a3f2c) to use with add_torrent.
 
     Args:
         query: Search terms to look for
@@ -157,21 +158,24 @@ async def get_torrent(id_or_hash: str, ctx: Context) -> str:
 
 @mcp.tool()
 async def add_torrent(
-    url: str,
+    torrent_id: str,
     ctx: Context,
     download_dir: str | None = None,
     paused: bool = False,
 ) -> str:
-    """Add a torrent by magnet link or URL.
+    """Add a torrent from search results.
+
+    Use the 5-character ID from search_torrents results (e.g. "a3f2c").
+    Also accepts magnet links directly.
 
     Args:
-        url: Magnet link or URL to a .torrent file
+        torrent_id: The 5-char ID from search results, or a magnet link
         download_dir: Optional override for download directory
         paused: Add in paused state (default: false)
     """
     return await manage.add_torrent(
         _torrent(ctx),
-        url,
+        torrent_id,
         download_dir=download_dir,
         paused=paused,
         http_client=_download_http(ctx),
