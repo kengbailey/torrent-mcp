@@ -14,7 +14,7 @@ async def test_search_torrents_formats_results() -> None:
             size=2147483648,
             seeders=50,
             leechers=10,
-            magnet_url="magnet:?xt=urn:btih:deadbeef",
+            download_url="http://prowlarr:9696/1/download?link=abc",
             category="Movies",
             indexer="1337x",
         ),
@@ -25,7 +25,8 @@ async def test_search_torrents_formats_results() -> None:
     assert "[1337x]" in result
     assert "Seeders: 50" in result
     assert "Leechers: 10" in result
-    assert "magnet:?xt=urn:btih:deadbeef" in result
+    assert "Link:" in result
+    assert "http://prowlarr:9696/1/download?link=abc" in result
     assert "Movies" in result
 
 
@@ -37,8 +38,8 @@ async def test_search_torrents_no_results() -> None:
     assert "No results found" in result
 
 
-async def test_search_torrents_download_url_fallback() -> None:
-    """When no magnet_url, should show download_url instead."""
+async def test_search_torrents_always_shows_link() -> None:
+    """Should always show Link with download_url, never Magnet."""
     client = AsyncMock()
     client.search.return_value = [
         SearchResult(
@@ -49,6 +50,8 @@ async def test_search_torrents_download_url_fallback() -> None:
     ]
 
     result = await search_torrents(client, "test")
+    assert "Link:" in result
+    assert "Magnet:" not in result
     assert "http://prowlarr:9696/1/download?link=abc" in result
 
 

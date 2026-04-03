@@ -44,9 +44,7 @@ async def search_torrents(
         if r.category:
             parts.append(f"Category: {r.category}")
         lines.append(f"   {' | '.join(parts)}")
-        if r.magnet_url:
-            lines.append(f"   Magnet: {r.magnet_url}")
-        elif r.download_url:
+        if r.download_url:
             lines.append(f"   Link: {r.download_url}")
         lines.append("")
 

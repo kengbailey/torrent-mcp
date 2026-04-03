@@ -64,7 +64,7 @@ async def test_search(
     assert r.seeders == 50
     assert r.leechers == 10
     assert r.size == 2147483648
-    assert r.magnet_url == "magnet:?xt=urn:btih:deadbeef"
+    assert r.magnet_url == ""
     assert r.download_url == "http://prowlarr:9696/1/download?link=abc"
     assert r.category == "Movies"
     assert r.indexer == "1337x"
@@ -98,13 +98,14 @@ async def test_search_respects_limit(
     assert len(results) == 1
 
 
-async def test_search_result_without_magnet(
+async def test_search_ignores_magnet_url(
     mock_transport: MockTransport, prowlarr_client: ProwlarrClient
 ) -> None:
-    """Results without magnetUrl should have empty magnet_url."""
-    mock_transport.add_response(httpx.Response(200, json=[SAMPLE_SEARCH_RESPONSE[1]]))
+    """magnetUrl from Prowlarr should not be populated — always empty."""
+    mock_transport.add_response(httpx.Response(200, json=SAMPLE_SEARCH_RESPONSE))
 
     results = await prowlarr_client.search("movie")
+    # Even though SAMPLE_SEARCH_RESPONSE[0] has magnetUrl, it should be ignored
     assert results[0].magnet_url == ""
     assert results[0].download_url != ""
 

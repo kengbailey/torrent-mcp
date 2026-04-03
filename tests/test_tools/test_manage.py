@@ -212,8 +212,8 @@ async def test_add_torrent_magnet_passthrough() -> None:
     assert call_kwargs.kwargs.get("torrent_data") is None
 
 
-async def test_add_torrent_http_proxy() -> None:
-    """HTTP URLs should be downloaded and proxied as torrent_data."""
+async def test_add_torrent_http_torrent_file() -> None:
+    """HTTP URLs returning .torrent files should be passed as torrent_data."""
     client = AsyncMock()
     client.add_torrent.return_value = TorrentInfo(
         name="Downloaded.Torrent",
@@ -228,8 +228,10 @@ async def test_add_torrent_http_proxy() -> None:
     )
 
     mock_response = AsyncMock()
+    mock_response.status_code = 200
     mock_response.content = b"fake torrent data"
     mock_response.raise_for_status = lambda: None
+    mock_response.headers = {}
 
     http_client = AsyncMock()
     http_client.get.return_value = mock_response
@@ -240,11 +242,43 @@ async def test_add_torrent_http_proxy() -> None:
         http_client=http_client,
     )
     assert "Torrent added" in result
-    # http_client should have been called
     http_client.get.assert_called_once()
-    # torrent_data should contain the downloaded bytes
     call_kwargs = client.add_torrent.call_args
     assert call_kwargs.kwargs.get("torrent_data") == b"fake torrent data"
+
+
+async def test_add_torrent_http_redirect_magnet() -> None:
+    """HTTP URLs that redirect to magnet: should pass magnet URI directly."""
+    client = AsyncMock()
+    client.add_torrent.return_value = TorrentInfo(
+        name="Magnet.Redirect.Torrent",
+        hash_string="redirecthash",
+        status="download queue",
+        percent_done=0.0,
+        rate_download=0,
+        rate_upload=0,
+        total_size=0,
+        eta=-1,
+        upload_ratio=0.0,
+    )
+
+    mock_response = AsyncMock()
+    mock_response.status_code = 301
+    mock_response.headers = {"location": "magnet:?xt=urn:btih:abc123&dn=Test"}
+
+    http_client = AsyncMock()
+    http_client.get.return_value = mock_response
+
+    result = await add_torrent(
+        client,
+        "http://prowlarr:9696/4/download?link=xyz",
+        http_client=http_client,
+    )
+    assert "Torrent added" in result
+    call_kwargs = client.add_torrent.call_args
+    # Should pass the magnet URI as url, not torrent_data
+    assert call_kwargs.args[0] == "magnet:?xt=urn:btih:abc123&dn=Test"
+    assert call_kwargs.kwargs.get("torrent_data") is None
 
 
 # --- start/stop/remove ---

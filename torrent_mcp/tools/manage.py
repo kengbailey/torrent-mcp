@@ -137,11 +137,23 @@ async def get_torrent(client: TorrentClient, id_or_hash: str) -> str:
 
 async def _download_torrent_file(
     http_client: httpx.AsyncClient, url: str
-) -> bytes:
-    """Download a .torrent file from a URL."""
-    response = await http_client.get(url, follow_redirects=True)
+) -> bytes | str:
+    """Download a .torrent file or capture a magnet URI from a Prowlarr download URL.
+
+    Returns bytes (torrent file content) or str (magnet URI).
+    """
+    response = await http_client.get(url, follow_redirects=False)
+
+    # Handle redirect to magnet URI
+    if response.status_code in (301, 302, 303, 307, 308):
+        location = str(response.headers.get("location", ""))
+        if location.startswith("magnet:"):
+            return location
+        # Non-magnet redirect — follow it
+        response = await http_client.get(location, follow_redirects=True)
+
     response.raise_for_status()
-    return response.content
+    return bytes(response.content)
 
 
 async def add_torrent(
@@ -160,18 +172,25 @@ async def add_torrent(
         http_client: HTTP client for downloading .torrent files from URLs
     """
     torrent_data: bytes | None = None
+    magnet_url: str = url
 
     if not url.startswith("magnet:") and http_client is not None:
         try:
-            torrent_data = await _download_torrent_file(http_client, url)
-            log.info("downloaded torrent file", url=url[:80], size=len(torrent_data))
+            result = await _download_torrent_file(http_client, url)
+            if isinstance(result, str):
+                # Got a magnet URI from redirect
+                magnet_url = result
+                log.info("resolved magnet URI", url=url[:80])
+            else:
+                torrent_data = result
+                log.info("downloaded torrent file", url=url[:80], size=len(torrent_data))
         except httpx.HTTPStatusError as exc:
             return f"Failed to download torrent file: HTTP {exc.response.status_code}"
         except httpx.ConnectError:
             return f"Failed to download torrent file: cannot connect to {url[:80]}"
 
     info = await client.add_torrent(
-        url, download_dir=download_dir, paused=paused, torrent_data=torrent_data
+        magnet_url, download_dir=download_dir, paused=paused, torrent_data=torrent_data
     )
 
     is_dup = info.name.startswith("[duplicate] ")

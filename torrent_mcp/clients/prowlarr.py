@@ -82,8 +82,9 @@ class ProwlarrClient:
                     size=int(item.get("size", 0)),
                     seeders=int(item.get("seeders", 0)),
                     leechers=int(item.get("leechers", 0)),
-                    download_url=str(item.get("downloadUrl", "")),
-                    magnet_url=str(item.get("magnetUrl", "")),
+                    download_url=str(
+                        item.get("downloadUrl") or item.get("magnetUrl") or ""
+                    ),
                     category=category_name,
                     publish_date=str(item.get("publishDate", "")),
                     indexer=str(item.get("indexer", "")),
